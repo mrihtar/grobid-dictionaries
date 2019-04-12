@@ -309,47 +309,52 @@ public class SenseParser extends AbstractParser {
 
         StringBuffer senses = new StringBuffer();
         LexicalEntryParser lexicalEntryParser = new LexicalEntryParser();
-        for (Pair<List<LayoutToken>, String> lexicalEntryLayoutTokens : doc.getBodyComponents().getLabels()) {
+        LabeledLexicalInformation bodyComponents = doc.getBodyComponents();
+        if (bodyComponents != null) {
+            for (Pair<List<LayoutToken>, String> lexicalEntryLayoutTokens : doc.getBodyComponents().getLabels()) {
 
-            if (lexicalEntryLayoutTokens.getRight().equals(DictionaryBodySegmentationLabels.DICTIONARY_ENTRY_LABEL)) {
-                LabeledLexicalInformation lexicalEntryComponents = lexicalEntryParser.process(lexicalEntryLayoutTokens.getLeft(), DICTIONARY_ENTRY_LABEL);
+                if (lexicalEntryLayoutTokens.getRight().equals(DictionaryBodySegmentationLabels.DICTIONARY_ENTRY_LABEL)) {
+                    LabeledLexicalInformation lexicalEntryComponents = lexicalEntryParser.process(lexicalEntryLayoutTokens.getLeft(), DICTIONARY_ENTRY_LABEL);
 
-                for (Pair<List<LayoutToken>, String> lexicalEntryComponent : lexicalEntryComponents.getLabels()) {
-                    if (lexicalEntryComponent.getRight().equals(LEXICAL_ENTRY_SENSE_LABEL)){
-                        //Write raw text
-                        for (LayoutToken txtline : lexicalEntryComponent.getLeft()) {
-                            rawtxt.append(txtline.getText());
-                        }
-                        senses.append("<sense>");
-                        LayoutTokenization layoutTokenization = new LayoutTokenization(lexicalEntryComponent.getLeft());
-                        String featSeg = FeatureVectorLexicalEntry.createFeaturesFromLayoutTokens(layoutTokenization.getTokenization()).toString();
-                        featureWriter.write(featSeg + "\n");
-                        if(isAnnotated){
-                            String labeledFeatures = null;
-                            // if featSeg is null, it usually means that no body segment is found in the
-
-                            if ((featSeg != null) && (featSeg.trim().length() > 0)) {
-
-
-                                labeledFeatures = label(featSeg);
-                                senses.append(toTEISense(labeledFeatures, layoutTokenization.getTokenization(), true));
+                    for (Pair<List<LayoutToken>, String> lexicalEntryComponent : lexicalEntryComponents.getLabels()) {
+                        if (lexicalEntryComponent.getRight().equals(LEXICAL_ENTRY_SENSE_LABEL)){
+                            //Write raw text
+                            for (LayoutToken txtline : lexicalEntryComponent.getLeft()) {
+                                rawtxt.append(txtline.getText());
                             }
-                        }
-                        else{
-                            senses.append(DocumentUtils.replaceLinebreaksWithTags(DocumentUtils.escapeHTMLCharac(LayoutTokensUtil.toText(lexicalEntryComponent.getLeft()))));
+                            senses.append("<sense>");
+                            LayoutTokenization layoutTokenization = new LayoutTokenization(lexicalEntryComponent.getLeft());
+                            String featSeg = FeatureVectorLexicalEntry.createFeaturesFromLayoutTokens(layoutTokenization.getTokenization()).toString();
+                            featureWriter.write(featSeg + "\n");
+                            if(isAnnotated){
+                                String labeledFeatures = null;
+                                // if featSeg is null, it usually means that no body segment is found in the
 
-                        }
+                                if ((featSeg != null) && (featSeg.trim().length() > 0)) {
 
-                        senses.append("</sense>");
+
+                                    labeledFeatures = label(featSeg);
+                                    if (labeledFeatures != null) {
+                                        senses.append(toTEISense(labeledFeatures, layoutTokenization.getTokenization(), true));
+                                    }
+                                }
+                            }
+                            else{
+                                senses.append(DocumentUtils.replaceLinebreaksWithTags(DocumentUtils.escapeHTMLCharac(LayoutTokensUtil.toText(lexicalEntryComponent.getLeft()))));
+
+                            }
+
+                            senses.append("</sense>");
+                        }
                     }
+
+
+
                 }
 
 
 
             }
-
-
-
         }
 
         //Writing RAW file (only text)

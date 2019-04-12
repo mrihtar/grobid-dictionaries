@@ -249,77 +249,81 @@ public class EtymParser extends AbstractParser {
         StringBuffer etyms = new StringBuffer();
         LexicalEntryParser lexicalEntryParser = new LexicalEntryParser();
         EtymQuoteParser etymQuoteParser = new EtymQuoteParser();
-        for (Pair<List<LayoutToken>, String> lexicalEntryLayoutTokens : doc.getBodyComponents().getLabels()) {
+        LabeledLexicalInformation bodyComponents = doc.getBodyComponents();
+        if (bodyComponents != null) {
+            for (Pair<List<LayoutToken>, String> lexicalEntryLayoutTokens : doc.getBodyComponents().getLabels()) {
 
-            if (lexicalEntryLayoutTokens.getRight().equals(DictionaryBodySegmentationLabels.DICTIONARY_ENTRY_LABEL)) {
-                LabeledLexicalInformation lexicalEntryComponents = lexicalEntryParser.process(lexicalEntryLayoutTokens.getLeft(), DICTIONARY_ENTRY_LABEL);
+                if (lexicalEntryLayoutTokens.getRight().equals(DictionaryBodySegmentationLabels.DICTIONARY_ENTRY_LABEL)) {
+                    LabeledLexicalInformation lexicalEntryComponents = lexicalEntryParser.process(lexicalEntryLayoutTokens.getLeft(), DICTIONARY_ENTRY_LABEL);
 
-                for (Pair<List<LayoutToken>, String> lexicalEntryComponent : lexicalEntryComponents.getLabels()) {
-                    if (lexicalEntryComponent.getRight().equals(LEXICAL_ENTRY_ETYM_LABEL)) {
-                        etyms.append("<etym>");
-                        LabeledLexicalInformation segOrQuoteComponents = etymQuoteParser.process(lexicalEntryComponent.getLeft(), EtymQuoteLabels.QUOTE__ETYMQUOTE_LABEL);
-                        for (Pair<List<LayoutToken>, String> segOrQuoteComponent : segOrQuoteComponents.getLabels()) {
-                            if (segOrQuoteComponent.getRight().equals(EtymQuoteLabels.QUOTE__ETYMQUOTE_LABEL)) {
-                                //Write raw text
-                                for (LayoutToken txtline : segOrQuoteComponent.getLeft()) {
-                                    rawtxt.append(txtline.getText());
-                                }
-                                etyms.append("<quote>");
-                                LayoutTokenization layoutTokenization = new LayoutTokenization(segOrQuoteComponent.getLeft());
-                                String featSeg = FeatureVectorLexicalEntry.createFeaturesFromLayoutTokens(layoutTokenization.getTokenization()).toString();
-                                featureWriter.write(featSeg + "\n");
-                                if (isAnnotated) {
-                                    String labeledFeatures = null;
-                                    // if featSeg is null, it usually means that no body segment is found in the
-
-                                    if ((featSeg != null) && (featSeg.trim().length() > 0)) {
-
-
-                                        labeledFeatures = label(featSeg);
-                                        etyms.append(toTEIEtym(labeledFeatures, layoutTokenization.getTokenization(), true));
+                    for (Pair<List<LayoutToken>, String> lexicalEntryComponent : lexicalEntryComponents.getLabels()) {
+                        if (lexicalEntryComponent.getRight().equals(LEXICAL_ENTRY_ETYM_LABEL)) {
+                            etyms.append("<etym>");
+                            LabeledLexicalInformation segOrQuoteComponents = etymQuoteParser.process(lexicalEntryComponent.getLeft(), EtymQuoteLabels.QUOTE__ETYMQUOTE_LABEL);
+                            for (Pair<List<LayoutToken>, String> segOrQuoteComponent : segOrQuoteComponents.getLabels()) {
+                                if (segOrQuoteComponent.getRight().equals(EtymQuoteLabels.QUOTE__ETYMQUOTE_LABEL)) {
+                                    //Write raw text
+                                    for (LayoutToken txtline : segOrQuoteComponent.getLeft()) {
+                                        rawtxt.append(txtline.getText());
                                     }
-                                } else {
-                                    etyms.append(DocumentUtils.replaceLinebreaksWithTags(DocumentUtils.escapeHTMLCharac(LayoutTokensUtil.toText(segOrQuoteComponent.getLeft()))));
-
-                                }
-
-                                etyms.append("</quote>");
-                            } else if (segOrQuoteComponent.getRight().equals(EtymQuoteLabels.SEG_ETYMQUOTE_LABEL)) {
-                                //Write raw text
-                                for (LayoutToken txtline : segOrQuoteComponent.getLeft()) {
-                                    rawtxt.append(txtline.getText());
-                                }
-                                etyms.append("<seg>");
-                                LayoutTokenization layoutTokenization = new LayoutTokenization(segOrQuoteComponent.getLeft());
-                                if (isAnnotated) {
+                                    etyms.append("<quote>");
+                                    LayoutTokenization layoutTokenization = new LayoutTokenization(segOrQuoteComponent.getLeft());
                                     String featSeg = FeatureVectorLexicalEntry.createFeaturesFromLayoutTokens(layoutTokenization.getTokenization()).toString();
-                                    String labeledFeatures = null;
-                                    // if featSeg is null, it usually means that no body segment is found in the
+                                    featureWriter.write(featSeg + "\n");
+                                    if (isAnnotated) {
+                                        String labeledFeatures = null;
+                                        // if featSeg is null, it usually means that no body segment is found in the
 
-                                    if ((featSeg != null) && (featSeg.trim().length() > 0)) {
-                                        featureWriter.write(featSeg + "\n");
+                                        if ((featSeg != null) && (featSeg.trim().length() > 0)) {
 
-                                        labeledFeatures = label(featSeg);
-                                        etyms.append(toTEIEtym(labeledFeatures, layoutTokenization.getTokenization(), true));
+
+                                            labeledFeatures = label(featSeg);
+                                            etyms.append(toTEIEtym(labeledFeatures, layoutTokenization.getTokenization(), true));
+                                        }
+                                    } else {
+                                        etyms.append(DocumentUtils.replaceLinebreaksWithTags(DocumentUtils.escapeHTMLCharac(LayoutTokensUtil.toText(segOrQuoteComponent.getLeft()))));
+
                                     }
-                                } else {
-                                    etyms.append(DocumentUtils.replaceLinebreaksWithTags(LayoutTokensUtil.toText(segOrQuoteComponent.getLeft())));
+
+                                    etyms.append("</quote>");
+                                } else if (segOrQuoteComponent.getRight().equals(EtymQuoteLabels.SEG_ETYMQUOTE_LABEL)) {
+                                    //Write raw text
+                                    for (LayoutToken txtline : segOrQuoteComponent.getLeft()) {
+                                        rawtxt.append(txtline.getText());
+                                    }
+                                    etyms.append("<seg>");
+                                    LayoutTokenization layoutTokenization = new LayoutTokenization(segOrQuoteComponent.getLeft());
+                                    if (isAnnotated) {
+                                        String featSeg = FeatureVectorLexicalEntry.createFeaturesFromLayoutTokens(layoutTokenization.getTokenization()).toString();
+                                        String labeledFeatures = null;
+                                        // if featSeg is null, it usually means that no body segment is found in the
+
+                                        if ((featSeg != null) && (featSeg.trim().length() > 0)) {
+                                            featureWriter.write(featSeg + "\n");
+
+                                            labeledFeatures = label(featSeg);
+                                            if (labeledFeatures != null) {
+                                                etyms.append(toTEIEtym(labeledFeatures, layoutTokenization.getTokenization(), true));
+                                            }
+                                        }
+                                    } else {
+                                        etyms.append(DocumentUtils.replaceLinebreaksWithTags(LayoutTokensUtil.toText(segOrQuoteComponent.getLeft())));
+
+                                    }
+
+                                    etyms.append("</seg>");
 
                                 }
-
-                                etyms.append("</seg>");
-
                             }
+                            etyms.append("</etym>");
                         }
-                        etyms.append("</etym>");
+
                     }
+
 
                 }
 
-
             }
-
-
         }
 
         //Writing RAW file (only text)

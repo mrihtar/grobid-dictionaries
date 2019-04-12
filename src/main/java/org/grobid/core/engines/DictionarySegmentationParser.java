@@ -255,7 +255,9 @@ public class DictionarySegmentationParser extends AbstractParser {
 
         if ((featSeg != null) && (featSeg.trim().length() > 0)) {
             labeledFeatures = label(featSeg);
-            segmentedDictionary = toTEIFormatDictionarySegmentation(config, null, labeledFeatures, doc).toString();
+            if (labeledFeatures != null) {
+                segmentedDictionary = toTEIFormatDictionarySegmentation(config, null, labeledFeatures, doc).toString();
+            }
         }
 
         return segmentedDictionary;

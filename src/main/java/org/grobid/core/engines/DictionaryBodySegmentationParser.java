@@ -119,11 +119,13 @@ public class DictionaryBodySegmentationParser extends AbstractParser {
 
                 if ((bodytextFeatured != null) && (bodytextFeatured.trim().length() > 0)) {
                     labeledFeatures = label(bodytextFeatured);
+
+                    if (labeledFeatures != null) {
+                        structuredBody = extractBodyComponents(layoutTokenization, labeledFeatures);
+
+                        doc.setBodyComponents(structuredBody);
+                    }
                 }
-
-                structuredBody = extractBodyComponents(layoutTokenization, labeledFeatures);
-
-                doc.setBodyComponents(structuredBody);
             }
 
             return doc;
