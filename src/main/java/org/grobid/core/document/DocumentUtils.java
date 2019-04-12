@@ -10,6 +10,7 @@ import org.grobid.core.utilities.GrobidProperties;
 import org.grobid.core.utilities.KeyGen;
 
 import java.io.File;
+import java.io.IOException;
 import java.text.DateFormat;
 import java.text.SimpleDateFormat;
 import java.util.ArrayList;
@@ -38,26 +39,26 @@ public class DocumentUtils {
 
         } finally {
             if (GrobidAnalysisConfig.defaultInstance().getPdfAssetPath() == null) {
-                documentSource.close(true, true);
+                documentSource.close(true, true,true);
             } else {
-                documentSource.close(false, true);
+                documentSource.close(false, true,true);
             }
         }
         return doc;
     }
 
-    public static LayoutTokenization getLayoutTokenizations(DictionaryDocument doc, SortedSet<DocumentPiece> documentBodyParts) {
+    public static LayoutTokenization getLayoutTokenizations(DictionaryDocument doc, SortedSet<DocumentPiece> documentParts) {
 
 
         List<LayoutToken> layoutTokens = new ArrayList<>();
 
-        if (documentBodyParts != null) {
+        if (documentParts != null) {
 
 
-            for (DocumentPiece docPiece : documentBodyParts) {
+            for (DocumentPiece docPiece : documentParts) {
                 //Every document Piece contains two Parts
-                DocumentPointer dp1 = docPiece.a;
-                DocumentPointer dp2 = docPiece.b;
+                DocumentPointer dp1 = docPiece.getLeft();
+                DocumentPointer dp2 = docPiece.getRight();
                 //The first part is identified by its first token. The second part is identified by its final token
                 int tokenStart = dp1.getTokenDocPos();
                 int tokenEnd = dp2.getTokenDocPos();
@@ -248,8 +249,8 @@ public class DocumentUtils {
         List<Block> documentPartBlocks = null;
 
         for (DocumentPiece docPiece : documentBodyParts) {
-            DocumentPointer dp1 = docPiece.a;
-            DocumentPointer dp2 = docPiece.b;
+            DocumentPointer dp1 = docPiece.getLeft();
+            DocumentPointer dp2 = docPiece.getRight();
 
             //int blockPos = dp1.getBlockPtr();
             for (int blockIndex = dp1.getBlockPtr(); blockIndex <= dp2.getBlockPtr(); blockIndex++) {
@@ -282,4 +283,61 @@ public class DocumentUtils {
 
         return text;
     }
+
+    public  String createMyXMLString(String elementName, String attributes, String elementContent) {
+        if (elementName.contains("<")){
+            elementName = elementName.replace("<", "").replace(">","");
+        }
+
+        StringBuilder xmlStringElement = new StringBuilder();
+        String[] attributeList ;
+
+        xmlStringElement.append("<");
+        xmlStringElement.append(elementName);
+        if (attributes!= null){
+            attributeList = attributes.split("-");
+            for (int i = 0; i < attributeList.length ; i += 2){
+                if (attributeList[i]!= null){
+                    xmlStringElement.append(" " + attributeList[i]+"=" + "\"" + attributeList[i+1] + "\"");
+                }
+
+            }
+
+        }
+
+        xmlStringElement.append(">");
+        xmlStringElement.append(elementContent);
+        xmlStringElement.append("</");
+        xmlStringElement.append(elementName);
+        xmlStringElement.append(">");
+        xmlStringElement.append("\n");
+
+        return xmlStringElement.toString();
+    }
+
+    public void produceXmlNode(StringBuilder buffer, String clusterContent, String tagLabel, String attributes) {
+
+        clusterContent = clusterContent.replace("&lt;lb/&gt;", "<lb/>");
+        clusterContent = DocumentUtils.escapeHTMLCharac(clusterContent);
+
+
+        buffer.append(createMyXMLString(tagLabel, attributes, clusterContent));
+
+
+    }
+
+//    public String reformatPonctuation(String stringWithPc) throws IOException {
+//
+//
+//        List<Integer> pcIndex = new ArrayList<>();
+//
+//        for (int i=0; i < stringWithPc.length(); i++){
+//
+//            stringWithPc.
+//
+//        }
+//
+//    }
+
+
 }

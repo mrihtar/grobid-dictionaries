@@ -15,7 +15,7 @@ form {
 
 pc {
 	display: inline;
-	background-color: SkyBlue;
+	background-color: #465eaf;
 }
 
 
@@ -54,7 +54,23 @@ desc {
 	display: inline;
 	background-color: olive;
 }
+note {
+	display: inline;
+	background-color: #9e0d41;
+}
+usg {
+	display: inline;
+	background-color: SkyBlue;
 
+}
+inflected {
+	display: inline;
+	background-color: #35b1eb;
+}
+ending {
+	display: inline;
+	background-color: #a94deb;
+}
 
 /* special whitespace handling for minimally better readability */
 lb:before { content: "\a "; }

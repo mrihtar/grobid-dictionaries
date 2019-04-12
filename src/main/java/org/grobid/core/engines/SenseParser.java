@@ -1,7 +1,7 @@
 package org.grobid.core.engines;
 
 import org.apache.commons.io.FileUtils;
-import org.apache.lucene.util.IOUtils;
+import org.apache.commons.io.IOUtils;
 import org.grobid.core.data.LabeledLexicalInformation;
 import org.grobid.core.document.DictionaryDocument;
 import org.grobid.core.document.DocumentUtils;
@@ -16,7 +16,8 @@ import org.grobid.core.layout.LayoutTokenization;
 import org.grobid.core.tokenization.TaggingTokenCluster;
 import org.grobid.core.tokenization.TaggingTokenClusteror;
 import org.grobid.core.utilities.LayoutTokensUtil;
-import org.grobid.core.utilities.Pair;
+//import org.grobid.core.utilities.Pair;
+import org.apache.commons.lang3.tuple.Pair;
 import org.grobid.core.utilities.TextUtilities;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
@@ -25,9 +26,7 @@ import java.io.*;
 import java.util.List;
 
 import static org.apache.commons.lang3.StringUtils.isBlank;
-import static org.grobid.core.document.TEIDictionaryFormatter.createMyXMLString;
 import static org.grobid.core.engines.label.DictionaryBodySegmentationLabels.DICTIONARY_ENTRY_LABEL;
-import static org.grobid.core.engines.label.LexicalEntryLabels.LEXICAL_ENTRY_FORM_LABEL;
 import static org.grobid.core.engines.label.LexicalEntryLabels.LEXICAL_ENTRY_SENSE_LABEL;
 
 /**
@@ -36,6 +35,7 @@ import static org.grobid.core.engines.label.LexicalEntryLabels.LEXICAL_ENTRY_SEN
 public class SenseParser extends AbstractParser {
     private static final Logger LOGGER = LoggerFactory.getLogger(SenseParser.class);
     private static volatile SenseParser instance;
+    private DocumentUtils formatter = new DocumentUtils();
 
     public SenseParser() {
         super(DictionaryModels.SENSE);
@@ -65,20 +65,24 @@ public class SenseParser extends AbstractParser {
         //I apply the form also to the sense to recognise the grammatical group, if any!
 
         for (Pair<List<LayoutToken>, String> entrySense : labeledSense.getLabels()) {
-            String tokenSense = LayoutTokensUtil.normalizeText(entrySense.getA());
-            String labelSense = entrySense.getB();
+            String tokenSense = LayoutTokensUtil.normalizeText(entrySense.getLeft());
+            String labelSense = entrySense.getRight();
 
             String content = DocumentUtils.escapeHTMLCharac(tokenSense);
             content = content.replace("&lt;lb/&gt;", "<lb/>");
 
 
-            if (labelSense.equals("<gramGrp>")) {
+            if (labelSense.equals("<subSense>")) {
+
+                sb.append(formatter.createMyXMLString("sense", null, content));
+
+            } else if (labelSense.equals("<gramGrp>")) {
                 sb.append("<gramGrp>");
-                sb.append(createMyXMLString("pos", content));
+                sb.append(formatter.createMyXMLString("pos", null, content));
                 sb.append("</gramGrp>").append("\n");
             }
             else {
-                sb.append(createMyXMLString(labelSense.replaceAll("[<>]", ""), content));
+                sb.append(formatter.createMyXMLString(labelSense, null, content));
             }
 
         }
@@ -166,7 +170,7 @@ public class SenseParser extends AbstractParser {
             List<LayoutToken> concatenatedTokens = cluster.concatTokens();
 
 
-            labelledLayoutTokens.addLabel(new Pair(concatenatedTokens,tagLabel));
+            labelledLayoutTokens.addLabel(Pair.of(concatenatedTokens,tagLabel));
         }
 
         return labelledLayoutTokens;
@@ -201,36 +205,13 @@ public class SenseParser extends AbstractParser {
             String tagLabel = clusterLabel.getLabel();
 
 
-            produceXmlNode(buffer, clusterContent, tagLabel);
+            formatter.produceXmlNode(buffer, clusterContent, tagLabel,null);
         }
 
         return buffer;
     }
 
-    private void produceXmlNode(StringBuilder buffer, String clusterContent, String tagLabel) {
 
-        clusterContent = clusterContent.replace("&lt;lb/&gt;", "<lb/>");
-        clusterContent = DocumentUtils.escapeHTMLCharac(clusterContent);
-
-
-        if (tagLabel.equals(SenseLabels.SENSE_SENSE_LABEL)) {
-            buffer.append(createMyXMLString("sense", clusterContent));
-        } else if (tagLabel.equals(SenseLabels.GRAMMATICAL_GROUP_SENSE_LABEL)) {
-            buffer.append(createMyXMLString("gramGrp", clusterContent));
-        } else if (tagLabel.equals(SenseLabels.PC_SENSE_LABEL)) {
-            buffer.append(createMyXMLString("pc", clusterContent));
-        } else if (tagLabel.equals(SenseLabels.DEF_SENSE_LABEL)) {
-            buffer.append(createMyXMLString("def", clusterContent));
-        } else if (tagLabel.equals(SenseLabels.NOTE_SENSE_LABEL)) {
-            buffer.append(createMyXMLString("note", clusterContent));
-        } else if (tagLabel.equals(SenseLabels.CIT_SENSE_LABEL)) {
-            buffer.append(createMyXMLString("cit", clusterContent));
-        } else if (tagLabel.equals(SenseLabels.DICTSCRAP_SENSE_LABEL)) {
-            buffer.append(createMyXMLString("dictScrap", clusterContent));
-        } else {
-            throw new IllegalArgumentException(tagLabel + " is not a valid possible tag");
-        }
-    }
 
     @SuppressWarnings({"UnusedParameters"})
     public int createTrainingBatch(String inputDirectory, String outputDirectory) throws IOException {
@@ -328,51 +309,47 @@ public class SenseParser extends AbstractParser {
 
         StringBuffer senses = new StringBuffer();
         LexicalEntryParser lexicalEntryParser = new LexicalEntryParser();
-        LabeledLexicalInformation bodyComponents = doc.getBodyComponents();
-        if (bodyComponents != null) {
-            for (Pair<List<LayoutToken>, String> lexicalEntryLayoutTokens : doc.getBodyComponents().getLabels()) {
+        for (Pair<List<LayoutToken>, String> lexicalEntryLayoutTokens : doc.getBodyComponents().getLabels()) {
 
-                if (lexicalEntryLayoutTokens.getB().equals(DictionaryBodySegmentationLabels.DICTIONARY_ENTRY_LABEL)) {
-                    LabeledLexicalInformation lexicalEntryComponents = lexicalEntryParser.process(lexicalEntryLayoutTokens.getA(), DICTIONARY_ENTRY_LABEL);
+            if (lexicalEntryLayoutTokens.getRight().equals(DictionaryBodySegmentationLabels.DICTIONARY_ENTRY_LABEL)) {
+                LabeledLexicalInformation lexicalEntryComponents = lexicalEntryParser.process(lexicalEntryLayoutTokens.getLeft(), DICTIONARY_ENTRY_LABEL);
 
-                    for (Pair<List<LayoutToken>, String> lexicalEntryComponent : lexicalEntryComponents.getLabels()) {
-                        if (lexicalEntryComponent.getB().equals(LEXICAL_ENTRY_SENSE_LABEL)){
-                            //Write raw text
-                            for (LayoutToken txtline : lexicalEntryComponent.getA()) {
-                                rawtxt.append(txtline.getText());
-                            }
-                            senses.append("<sense>");
-                            LayoutTokenization layoutTokenization = new LayoutTokenization(lexicalEntryComponent.getA());
-                            String featSeg = FeatureVectorLexicalEntry.createFeaturesFromLayoutTokens(layoutTokenization.getTokenization()).toString();
-                            featureWriter.write(featSeg + "\n");
-                            if(isAnnotated){
-                                String labeledFeatures = null;
-                                // if featSeg is null, it usually means that no body segment is found in the
-
-                                if ((featSeg != null) && (featSeg.trim().length() > 0)) {
-                                    labeledFeatures = label(featSeg);
-
-                                    if (labeledFeatures != null) {
-                                        senses.append(toTEISense(labeledFeatures, layoutTokenization.getTokenization(), true));
-                                    }
-                                }
-                            }
-                            else{
-                                senses.append(DocumentUtils.replaceLinebreaksWithTags(DocumentUtils.escapeHTMLCharac(LayoutTokensUtil.toText(lexicalEntryComponent.getA()))));
-
-                            }
-
-                            senses.append("</sense>");
+                for (Pair<List<LayoutToken>, String> lexicalEntryComponent : lexicalEntryComponents.getLabels()) {
+                    if (lexicalEntryComponent.getRight().equals(LEXICAL_ENTRY_SENSE_LABEL)){
+                        //Write raw text
+                        for (LayoutToken txtline : lexicalEntryComponent.getLeft()) {
+                            rawtxt.append(txtline.getText());
                         }
+                        senses.append("<sense>");
+                        LayoutTokenization layoutTokenization = new LayoutTokenization(lexicalEntryComponent.getLeft());
+                        String featSeg = FeatureVectorLexicalEntry.createFeaturesFromLayoutTokens(layoutTokenization.getTokenization()).toString();
+                        featureWriter.write(featSeg + "\n");
+                        if(isAnnotated){
+                            String labeledFeatures = null;
+                            // if featSeg is null, it usually means that no body segment is found in the
+
+                            if ((featSeg != null) && (featSeg.trim().length() > 0)) {
+
+
+                                labeledFeatures = label(featSeg);
+                                senses.append(toTEISense(labeledFeatures, layoutTokenization.getTokenization(), true));
+                            }
+                        }
+                        else{
+                            senses.append(DocumentUtils.replaceLinebreaksWithTags(DocumentUtils.escapeHTMLCharac(LayoutTokensUtil.toText(lexicalEntryComponent.getLeft()))));
+
+                        }
+
+                        senses.append("</sense>");
                     }
-
-
-
                 }
 
 
 
             }
+
+
+
         }
 
         //Writing RAW file (only text)
@@ -394,7 +371,7 @@ public class SenseParser extends AbstractParser {
         teiWriter.write("\n\t</text>\n</tei>\n");
 
 
-        IOUtils.closeWhileHandlingException(featureWriter, teiWriter);
+        IOUtils.closeQuietly(featureWriter, teiWriter);
     }
 
     private static void copyFileUsingStream(File source, File dest) throws IOException {

@@ -6,9 +6,11 @@ import com.google.common.collect.TreeMultimap;
 import eugfc.imageio.plugins.PNMRegistry;
 import org.apache.commons.io.FileUtils;
 import org.apache.commons.lang3.StringEscapeUtils;
-import org.apache.lucene.util.IOUtils;
+import org.apache.commons.io.IOUtils;
+import org.grobid.core.data.LabeledLexicalInformation;
 import org.grobid.core.document.*;
 import org.grobid.core.engines.config.GrobidAnalysisConfig;
+import org.grobid.core.engines.label.DictionarySegmentationLabels;
 import org.grobid.core.engines.tagging.GenericTaggerUtils;
 import org.grobid.core.exceptions.GrobidException;
 import org.grobid.core.exceptions.GrobidExceptionStatus;
@@ -16,6 +18,7 @@ import org.grobid.core.features.FeatureFactory;
 import org.grobid.core.features.FeaturesVectorSegmentation;
 import org.grobid.core.layout.*;
 import org.grobid.core.utilities.*;
+import org.apache.commons.lang3.tuple.Pair;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
@@ -29,6 +32,7 @@ import java.util.regex.Matcher;
 
 import static org.apache.commons.lang3.StringUtils.isNotEmpty;
 import static org.apache.commons.lang3.StringUtils.trim;
+import static org.grobid.core.engines.label.DictionarySegmentationLabels.DICTIONARY_HEADNOTE_LABEL;
 
 /**
  * Created by med on 02.08.16.
@@ -113,7 +117,7 @@ public class DictionarySegmentationParser extends AbstractParser {
         String ignoredLabel = "@IGNORED_LABEL@";
         for (Pair<String, String> labeledTokenPair :
                 Iterables.concat(labeledTokens,
-                        Collections.singleton(new Pair<String, String>("IgnoredToken", ignoredLabel)))) {
+                        Collections.singleton(Pair.of("IgnoredToken", ignoredLabel)))) {
             if (labeledTokenPair == null) {
                 p++;
                 continue;
@@ -163,7 +167,7 @@ public class DictionarySegmentationParser extends AbstractParser {
                             && (currentLineStartPos != lastTokenInd)) {
                         currentLineStartPos++;
                     }
-                    if (!labeledTokenPair.a.startsWith(documentTokens.get(currentLineStartPos).getText())) {
+                    if (!labeledTokenPair.getLeft().startsWith(documentTokens.get(currentLineStartPos).getText())) {
                         while (currentLineStartPos < block.getEndToken()) {
                             if (documentTokens.get(currentLineStartPos).t().equals("\n")
                                     || documentTokens.get(currentLineStartPos).t().equals("\r")) {
@@ -175,7 +179,7 @@ public class DictionarySegmentationParser extends AbstractParser {
                                     currentLineStartPos++;
                                 }
                                 if ((currentLineStartPos != lastTokenInd) &&
-                                        labeledTokenPair.a.startsWith(documentTokens.get(currentLineStartPos).getText())) {
+                                        labeledTokenPair.getLeft().startsWith(documentTokens.get(currentLineStartPos).getText())) {
                                     break;
                                 }
                             }
@@ -195,7 +199,7 @@ public class DictionarySegmentationParser extends AbstractParser {
                     }
                 }
             }
-            curLabel = labeledTokenPair.b;
+            curLabel = labeledTokenPair.getRight();
             curPlainLabel = GenericTaggerUtils.getPlainLabel(curLabel);
 
 
@@ -251,10 +255,7 @@ public class DictionarySegmentationParser extends AbstractParser {
 
         if ((featSeg != null) && (featSeg.trim().length() > 0)) {
             labeledFeatures = label(featSeg);
-
-            if (labeledFeatures != null) {
-                segmentedDictionary = toTEIFormatDictionarySegmentation(config, null, labeledFeatures, doc).toString();
-            }
+            segmentedDictionary = toTEIFormatDictionarySegmentation(config, null, labeledFeatures, doc).toString();
         }
 
         return segmentedDictionary;
@@ -284,10 +285,10 @@ public class DictionarySegmentationParser extends AbstractParser {
             // keep it clean when leaving...
             if (config.getPdfAssetPath() == null) {
                 // remove the pdf2xml tmp file
-                DocumentSource.close(documentSource, false, true);
+                DocumentSource.close(documentSource, false, true,true);
             } else {
                 // remove the pdf2xml tmp files, including the sub-directories
-                DocumentSource.close(documentSource, true, true);
+                DocumentSource.close(documentSource, true, true,true);
             }
         }
     }
@@ -393,8 +394,66 @@ public class DictionarySegmentationParser extends AbstractParser {
             // the method is originally implemented in BasicStructureBuilder class but it is
             // reimplemented here to be able to use DictionaryDocument object
             doc = generalResultSegmentation(doc, labelledResult, tokenizations);
+
+
         }
         return doc;
+    }
+
+    public void optimise(DictionaryDocument doc, String dictionaryPartLabel) {
+        //Optimise Headnotes
+        List<DocumentPiece> aDocumentPartOfAllPages = new ArrayList<>(doc.getDocumentDictionaryPart(dictionaryPartLabel));
+        if (aDocumentPartOfAllPages.size() > 0) {
+            LabeledLexicalInformation headnotesOptimised = new LabeledLexicalInformation();
+            List<LayoutToken> currentHeadnote = new ArrayList<>(doc.getDocumentPieceTokenization(aDocumentPartOfAllPages.get(0)));
+            int previousHeadnotePageNumber = 0;
+            currentHeadnote.get(currentHeadnote.size() - 1).getPage();
+            int currentHeadnotePageNumber = 0;
+            int i = 1;
+            //
+            while (i < aDocumentPartOfAllPages.size() - 1) {
+                previousHeadnotePageNumber = currentHeadnote.get(0).getPage();
+                List<DocumentPiece> restOfHeads = aDocumentPartOfAllPages.subList(i, aDocumentPartOfAllPages.size() - 1);
+                for (int j = 0; j < restOfHeads.size(); j++) {
+                    List<LayoutToken> aHeadnote = new ArrayList<>(doc.getDocumentPieceTokenization(restOfHeads.get(j)));
+                    currentHeadnotePageNumber = aHeadnote.get(aHeadnote.size() - 1).getPage();
+
+                    if (currentHeadnotePageNumber > previousHeadnotePageNumber) {
+
+                        headnotesOptimised.addLabel(Pair.of(currentHeadnote, dictionaryPartLabel));
+
+                        currentHeadnote = doc.getDocumentPieceTokenization(aDocumentPartOfAllPages.get(i));
+                        i++;
+                        break;
+                    } else {
+                        List<LayoutToken> sameHeadnote = doc.getDocumentPieceTokenization(restOfHeads.get(j));
+                        currentHeadnote.addAll(sameHeadnote);
+
+                    }
+
+                    i++;
+                }
+
+
+            }
+            List<LayoutToken> lastHeadnote = new ArrayList<>(doc.getDocumentPieceTokenization(aDocumentPartOfAllPages.get(aDocumentPartOfAllPages.size() - 1)));
+            // Careful with page number of first tokens which could have the same number as the previous page. So take the last one
+            currentHeadnotePageNumber = lastHeadnote.get(lastHeadnote.size() - 1).getPage();
+            if (currentHeadnotePageNumber == previousHeadnotePageNumber) {
+
+                List<LayoutToken> newHeadnote = lastHeadnote;
+                currentHeadnote.addAll(newHeadnote);
+
+            }
+            if (aDocumentPartOfAllPages.size() !=1 ){
+                headnotesOptimised.addLabel(Pair.of(currentHeadnote, dictionaryPartLabel));
+            }
+
+            headnotesOptimised.addLabel(Pair.of(lastHeadnote, dictionaryPartLabel));
+            doc.setDictionaryPagePartOptimised(headnotesOptimised,dictionaryPartLabel);
+
+        }
+
     }
 
     /**
@@ -902,7 +961,7 @@ public class DictionarySegmentationParser extends AbstractParser {
         Writer writer = new OutputStreamWriter(new FileOutputStream(new File(featuresFile), false), "UTF-8");
         String featuredText = getAllLinesFeatured(doc);
         writer.write(featuredText);
-        IOUtils.closeWhileHandlingException(writer);
+        IOUtils.closeQuietly(writer);
 
         //Create rng and css files for guiding the annotation
         File existingRngFile = new File("templates/dictionarySegmentation.rng");
@@ -946,7 +1005,7 @@ public class DictionarySegmentationParser extends AbstractParser {
                 "<tei xml:space=\"preserve\">\n\t<teiHeader>\n\t\t<fileDesc xml:id=\"" +
                 "\"/>\n\t</teiHeader>\n\t<text>");
 
-        writer.write(bufferFulltext.toString().replaceAll("&","&amp;"));
+        writer.write(bufferFulltext.toString().replaceAll("&", "&amp;"));
         writer.write("\n\t</text>\n</tei>\n");
         writer.close();
 
@@ -994,9 +1053,9 @@ public class DictionarySegmentationParser extends AbstractParser {
                 while (stt.hasMoreTokens()) {
                     String s = stt.nextToken().trim();
                     if (i == 0) {
-                   //     s2 = TextUtilities.HTMLEncode(s); // lexical token
+                        //     s2 = TextUtilities.HTMLEncode(s); // lexical token
                     } else if (i == 1) {
-                   //     s3 = TextUtilities.HTMLEncode(s); // second lexical token
+                        //     s3 = TextUtilities.HTMLEncode(s); // second lexical token
                     } else if (i == ll - 1) {
                         s1 = s; // current label
                     } else {

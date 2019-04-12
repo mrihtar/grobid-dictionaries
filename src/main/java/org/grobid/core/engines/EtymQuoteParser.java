@@ -2,7 +2,8 @@ package org.grobid.core.engines;
 
 import org.apache.commons.io.FileUtils;
 import org.apache.commons.lang3.StringUtils;
-import org.apache.lucene.util.IOUtils;
+
+import org.apache.commons.io.IOUtils;
 import org.grobid.core.data.LabeledLexicalInformation;
 import org.grobid.core.document.DictionaryDocument;
 import org.grobid.core.document.DocumentUtils;
@@ -14,7 +15,8 @@ import org.grobid.core.layout.LayoutTokenization;
 import org.grobid.core.tokenization.TaggingTokenCluster;
 import org.grobid.core.tokenization.TaggingTokenClusteror;
 import org.grobid.core.utilities.LayoutTokensUtil;
-import org.grobid.core.utilities.Pair;
+//import org.grobid.core.utilities.Pair;
+import org.apache.commons.lang3.tuple.Pair;
 import org.grobid.core.utilities.TextUtilities;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
@@ -22,7 +24,7 @@ import org.slf4j.LoggerFactory;
 import java.io.*;
 import java.util.List;
 
-import static org.grobid.core.document.TEIDictionaryFormatter.createMyXMLString;
+
 import static org.grobid.core.engines.label.DictionaryBodySegmentationLabels.DICTIONARY_ENTRY_LABEL;
 import static org.grobid.core.engines.label.LexicalEntryLabels.LEXICAL_ENTRY_ETYM_LABEL;
 import static org.grobid.service.DictionaryPaths.PATH_FULL_DICTIONARY;
@@ -33,6 +35,7 @@ import static org.grobid.service.DictionaryPaths.PATH_FULL_DICTIONARY;
 public class EtymQuoteParser extends AbstractParser {
     private static final Logger LOGGER = LoggerFactory.getLogger(EtymQuoteParser.class);
     private static volatile EtymQuoteParser instance;
+    private DocumentUtils formatter = new DocumentUtils();
 
     public EtymQuoteParser() {
         super(DictionaryModels.ETYM_QUOTE);
@@ -58,13 +61,13 @@ public class EtymQuoteParser extends AbstractParser {
         //I apply the form also to the sense to recognise the grammatical group, if any!
 
         for (Pair<List<LayoutToken>, String> entrySense : labeledSense.getLabels()) {
-            String tokenSense = LayoutTokensUtil.normalizeText(entrySense.getA());
-            String labelSense = entrySense.getB();
+            String tokenSense = LayoutTokensUtil.normalizeText(entrySense.getLeft());
+            String labelSense = entrySense.getRight();
 
             String content = DocumentUtils.escapeHTMLCharac(tokenSense);
             content = content.replace("&lt;lb/&gt;", "<lb/>");
 
-            sb.append(createMyXMLString(labelSense.replaceAll("[<>]", ""), content));
+            sb.append(formatter.createMyXMLString(labelSense, null, content));
 
         }
         sb.append("</etym>").append("\n");
@@ -96,7 +99,7 @@ public class EtymQuoteParser extends AbstractParser {
                 List<LayoutToken> concatenatedTokens = cluster.concatTokens();
                 String tagLabel = clusterLabel.getLabel();
 
-                labeledLexicalEntry.addLabel(new Pair(concatenatedTokens, tagLabel));
+                labeledLexicalEntry.addLabel(Pair.of(concatenatedTokens, tagLabel));
             }
         }
 
@@ -132,35 +135,12 @@ public class EtymQuoteParser extends AbstractParser {
             String tagLabel = clusterLabel.getLabel();
 
 
-            produceXmlNode(buffer, clusterContent, tagLabel);
+            formatter.produceXmlNode(buffer, clusterContent, tagLabel,null);
         }
 
         return buffer;
     }
 
-    private void produceXmlNode(StringBuilder buffer, String clusterContent, String tagLabel) {
-
-        clusterContent = clusterContent.replace("&lt;lb/&gt;", "<lb/>");
-        clusterContent = DocumentUtils.escapeHTMLCharac(clusterContent);
-
-        if (tagLabel.equals(DictionaryBodySegmentationLabels.DICTIONARY_DICTSCRAP_LABEL)) {
-            buffer.append(createMyXMLString("dictScrap", clusterContent));
-        } else if (tagLabel.equals(DictionaryBodySegmentationLabels.PUNCTUATION_LABEL)) {
-            buffer.append(createMyXMLString("pc", clusterContent));
-        } else if (tagLabel.equals(LexicalEntryLabels.LEXICAL_ENTRY_RE_LABEL)) {
-            buffer.append(createMyXMLString("re", clusterContent));
-        } else if (tagLabel.equals(LexicalEntryLabels.LEXICAL_ENTRY_OTHER_LABEL)) {
-            buffer.append(createMyXMLString("dictScrap", clusterContent));
-        } else if (tagLabel.equals(EtymQuoteLabels.ETYM_QUOTE_SEG)) {
-            buffer.append(createMyXMLString("quote", clusterContent));
-        } else if (tagLabel.equals(EtymQuoteLabels.ETYM_QUOTE_SEG)) {
-            buffer.append(createMyXMLString("seg", clusterContent));
-        } else if (tagLabel.equals(EtymLabels.SEG_ETYM_LABEL)) {
-
-        } else {
-            throw new IllegalArgumentException(tagLabel + " is not a valid possible tag");
-        }
-    }
 
     @SuppressWarnings({"UnusedParameters"})
     public int createTrainingBatch(String inputDirectory, String outputDirectory) throws IOException {
@@ -258,48 +238,44 @@ public class EtymQuoteParser extends AbstractParser {
 
         StringBuffer etymQuotes = new StringBuffer();
         LexicalEntryParser lexicalEntryParser = new LexicalEntryParser();
-        LabeledLexicalInformation bodyComponents = doc.getBodyComponents();
-        if (bodyComponents != null) {
-            for (Pair<List<LayoutToken>, String> lexicalEntryLayoutTokens : doc.getBodyComponents().getLabels()) {
+        for (Pair<List<LayoutToken>, String> lexicalEntryLayoutTokens : doc.getBodyComponents().getLabels()) {
 
-                if (lexicalEntryLayoutTokens.getB().equals(DictionaryBodySegmentationLabels.DICTIONARY_ENTRY_LABEL)) {
-                    LabeledLexicalInformation lexicalEntryComponents = lexicalEntryParser.process(lexicalEntryLayoutTokens.getA(), DICTIONARY_ENTRY_LABEL);
+            if (lexicalEntryLayoutTokens.getRight().equals(DictionaryBodySegmentationLabels.DICTIONARY_ENTRY_LABEL)) {
+                LabeledLexicalInformation lexicalEntryComponents = lexicalEntryParser.process(lexicalEntryLayoutTokens.getLeft(), DICTIONARY_ENTRY_LABEL);
 
-                    for (Pair<List<LayoutToken>, String> lexicalEntryComponent : lexicalEntryComponents.getLabels()) {
-                        if (lexicalEntryComponent.getB().equals(LEXICAL_ENTRY_ETYM_LABEL)) {
-                            //Write raw text
-                            for (LayoutToken txtline : lexicalEntryComponent.getA()) {
-                                rawtxt.append(txtline.getText());
-                            }
-                            etymQuotes.append("<etym>");
-                            LayoutTokenization layoutTokenization = new LayoutTokenization(lexicalEntryComponent.getA());
-                            String featSeg = FeatureVectorLexicalEntry.createFeaturesFromLayoutTokens(layoutTokenization.getTokenization()).toString();
-                            featureWriter.write(featSeg + "\n");
-                            if (isAnnotated) {
-                                String labeledFeatures = null;
-                                // if featSeg is null, it usually means that no body segment is found in the
-
-                                if ((featSeg != null) && (featSeg.trim().length() > 0)) {
-                                    labeledFeatures = label(featSeg);
-
-                                    if (labeledFeatures != null) {
-                                        etymQuotes.append(toTEIEtymQuote(labeledFeatures, layoutTokenization.getTokenization(), true));
-                                    }
-                                }
-                            } else {
-                                etymQuotes.append(DocumentUtils.replaceLinebreaksWithTags(DocumentUtils.escapeHTMLCharac(LayoutTokensUtil.toText(lexicalEntryComponent.getA()))));
-
-                            }
-
-                            etymQuotes.append("</etym>");
+                for (Pair<List<LayoutToken>, String> lexicalEntryComponent : lexicalEntryComponents.getLabels()) {
+                    if (lexicalEntryComponent.getRight().equals(LEXICAL_ENTRY_ETYM_LABEL)) {
+                        //Write raw text
+                        for (LayoutToken txtline : lexicalEntryComponent.getLeft()) {
+                            rawtxt.append(txtline.getText());
                         }
+                        etymQuotes.append("<etym>");
+                        LayoutTokenization layoutTokenization = new LayoutTokenization(lexicalEntryComponent.getLeft());
+                        String featSeg = FeatureVectorLexicalEntry.createFeaturesFromLayoutTokens(layoutTokenization.getTokenization()).toString();
+                        featureWriter.write(featSeg + "\n");
+                        if (isAnnotated) {
+                            String labeledFeatures = null;
+                            // if featSeg is null, it usually means that no body segment is found in the
+
+                            if ((featSeg != null) && (featSeg.trim().length() > 0)) {
+
+
+                                labeledFeatures = label(featSeg);
+                                etymQuotes.append(toTEIEtymQuote(labeledFeatures, layoutTokenization.getTokenization(), true));
+                            }
+                        } else {
+                            etymQuotes.append(DocumentUtils.replaceLinebreaksWithTags(DocumentUtils.escapeHTMLCharac(LayoutTokensUtil.toText(lexicalEntryComponent.getLeft()))));
+
+                        }
+
+                        etymQuotes.append("</etym>");
                     }
-
-
                 }
 
 
             }
+
+
         }
 
         //Writing RAW file (only text)
@@ -320,7 +296,8 @@ public class EtymQuoteParser extends AbstractParser {
         teiWriter.write("\n\t</text>\n</tei>\n");
 
 
-        IOUtils.closeWhileHandlingException(featureWriter, teiWriter);
+        IOUtils.closeQuietly(featureWriter);
+        IOUtils.closeQuietly(teiWriter);
     }
 
     private static void copyFileUsingStream(File source, File dest) throws IOException {

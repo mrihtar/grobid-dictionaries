@@ -7,7 +7,7 @@
     <groupId>org.grobid</groupId>
     <artifactId>grobid-dictionaries</artifactId>
     <name>${project.artifactId}</name>
-    <version>0.4.3-SNAPSHOT</version>
+    <version>0.5.4-SNAPSHOT</version>
     <packaging>war</packaging>
 
     <properties>
@@ -33,12 +33,12 @@
         <dependency>
             <groupId>org.grobid</groupId>
             <artifactId>grobid-core</artifactId>
-            <version>0.5.0</version>
+            <version>0.5.4-SNAPSHOT</version>
         </dependency>
         <dependency>
             <groupId>org.grobid</groupId>
             <artifactId>grobid-trainer</artifactId>
-            <version>0.5.0</version>
+            <version>0.5.4-SNAPSHOT</version>
         </dependency>
 
 
@@ -117,6 +117,11 @@
             <groupId>com.fasterxml.jackson.core</groupId>
             <artifactId>jackson-annotations</artifactId>
             <version>2.9.0</version>
+        </dependency>
+        <dependency>
+            <groupId>com.google.guava</groupId>
+            <artifactId>guava</artifactId>
+            <version>27.0.1-jre</version>
         </dependency>
 
         <!-- RESTful services -->
@@ -288,7 +293,9 @@
             <plugin>
                 <groupId>org.eclipse.jetty</groupId>
                 <artifactId>jetty-maven-plugin</artifactId>
-                <version>9.4.5.v20170502</version>
+                <!--<version>9.4.5.v20170502</version>-->
+                <version>9.4.11.v20180605</version>
+
 
                 <configuration>
                     <webApp>
@@ -386,6 +393,29 @@
                                 </goals>
                                 <configuration>
                                     <mainClass>org.grobid.trainer.SenseTrainer</mainClass>
+                                </configuration>
+                            </execution>
+                        </executions>
+                    </plugin>
+                </plugins>
+            </build>
+        </profile>
+        <profile>
+            <id>train_sub_sense</id>
+            <build>
+                <plugins>
+                    <plugin>
+                        <groupId>org.codehaus.mojo</groupId>
+                        <artifactId>exec-maven-plugin</artifactId>
+                        <version>1.6.0</version>
+                        <executions>
+                            <execution>
+                                <phase>generate-resources</phase>
+                                <goals>
+                                    <goal>java</goal>
+                                </goals>
+                                <configuration>
+                                    <mainClass>org.grobid.trainer.SubSenseTrainer</mainClass>
                                 </configuration>
                             </execution>
                         </executions>

@@ -23,27 +23,29 @@ RUN \
 #To clone from fork
  RUN \
   git clone https://github.com/MedKhem/grobid && \
-  cd grobid && ./gradlew clean install 
+  cd grobid && \
+  ./gradlew clean install
 
 # To copy from a local directory
 #COPY grobid-master.zip grobid-master.zip
-#RUN unzip grobid-master.zip && mv grobid-master grobid && rm grobid-master.zip && cd #grobid && ./gradlew clean install 
+#RUN unzip grobid-master.zip && mv grobid-master grobid && rm grobid-master.zip && cd #grobid && ./gradlew clean install
 
-RUN rm -r /grobid/grobid-service/ && rm -r /grobid/grobid-trainer/resources/ && rm -r /grobid/grobid-home/models/* && rm -r /grobid/grobid-home/build/distributions/*
-
+RUN rm -r /grobid/grobid-service/ && rm -r /grobid/grobid-trainer/resources/
 
 #To clone from fork
  RUN \
   cd /grobid && \
   git clone https://github.com/MedKhem/grobid-dictionaries
-
-# To copy from a local directory
-#COPY grobid-dictionaries /grobid/grobid-dictionaries
-
-
+#
+## To copy from a local directory
+##COPY grobid-dictionaries /grobid/grobid-dictionaries
+#
+#
 RUN \
   cd /grobid/grobid-dictionaries && \
   mv toyData resources && \
+mvn install:install-file -Dfile=grobidDependencies/grobid-core-0.5.4-SNAPSHOT.jar -DgroupId=org.grobid -DartifactId=grobid-core -Dversion=0.5.4-SNAPSHOT -Dpackaging=jar && \
+mvn install:install-file -Dfile=grobidDependencies/grobid-trainer-0.5.4-SNAPSHOT.jar -DgroupId=org.grobid -DartifactId=grobid-trainer -Dversion=0.5.4-SNAPSHOT -Dpackaging=jar && \
  mvn -Dmaven.test.skip=true clean install && \
  mvn generate-resources -P train_dictionary_segmentation -e && \
  mvn generate-resources -P train_dictionary_body_segmentation -e && \
@@ -52,6 +54,10 @@ RUN \
  mvn generate-resources -P train_sense -e && \
  mvn generate-resources -P train_etymQuote -e && \
  mvn generate-resources -P train_etym -e
+# && \
+# mvn -Dmaven.test.skip=true jetty:run-war && \
+# kill -INT 888
+
 
 WORKDIR /grobid/grobid-dictionaries
 EXPOSE 8080
@@ -63,7 +69,7 @@ EXPOSE 8080
 # docker images -a
 
 ##See containers
-# docker ps -a 
+# docker ps -a
 
 ##To Stop all containers
 #docker stop $(docker ps -qa)

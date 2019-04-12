@@ -139,7 +139,50 @@
 			</oneOrMore>
 		</element>
 	</define>
-
+	<define name="note">
+		<element name="note">
+			<oneOrMore>
+				<choice>
+					<text/>
+					<ref name="pc"/>
+					<ref name="lb"/>
+				</choice>
+			</oneOrMore>
+		</element>
+	</define>
+	<define name="xr">
+		<element name="xr">
+			<oneOrMore>
+				<choice>
+					<text/>
+					<ref name="pc"/>
+					<ref name="lb"/>
+				</choice>
+			</oneOrMore>
+		</element>
+	</define>
+	<define name="ending">
+		<element name="ending">
+			<oneOrMore>
+				<choice>
+					<text/>
+					<ref name="pc"/>
+					<ref name="lb"/>
+				</choice>
+			</oneOrMore>
+		</element>
+	</define>
+	<define name="inflected">
+		<element name="inflected">
+			<oneOrMore>
+				<choice>
+					<text/>
+					<ref name="pc"/>
+					<ref name="lb"/>
+				</choice>
+			</oneOrMore>
+		</element>
+	</define>
 	<define name="form">
 		<element name="form">
 			<oneOrMore>
@@ -153,6 +196,10 @@
 					<ref name="lang"/>
 					<ref name="name"/>
 					<ref name="desc"/>
+					<ref name="note"/>
+					<ref name="ending"/>
+					<ref name="inflected"/>
+					<ref name="xr"/>
 					<ref name="dictScrap"/>
 
 				</choice>
